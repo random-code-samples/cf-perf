@@ -13,6 +13,7 @@ async function run<T>(id: string, input: T[], iteration: (input: T, index: numbe
 		t.start();
 		const ps: Promise<unknown>[] = [];
 		for (let i = 0; i < input.length; i++) {
+			t.addKey(input[i]);
 			ps.push(iteration(input[i], i));
 		}
 		await Promise.all(ps);
@@ -20,6 +21,7 @@ async function run<T>(id: string, input: T[], iteration: (input: T, index: numbe
 	} else {
 		for (let i = 0; i < input.length; i++) {
 			t.start();
+			t.addKey(input[i]);
 			await iteration(input[i], i);
 			t.end();
 		}
@@ -35,14 +37,20 @@ function parseIntParam(url: URL, name: string, defVal: number): number {
 export default {
 	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(req.url);
+		/*
 		const repeat = parseIntParam(url, "r", 4);
 		const valLen = parseIntParam(url, "v", 1024);
 		const keyLen = parseIntParam(url, "k", 16);
+		*/
+		const repeat = 4;
+		const valLen = 1024;
+		const keyLen = 16;
 		const val = randomHexString(valLen);
 		const keys = newArray(repeat, _ => randomHexString(keyLen));
 
 		let res: Timer[] = [];
 		res.push(await run("kv-read-miss", keys, async (input: string) => await env.KV.get(input)));
+		res.push(await run("kv-read-miss-cache", keys, async (input: string) => await env.KV.get(input)));
 		res.push(await run("kv-write", keys, async (input: string) => await env.KV.put(input, val)));
 		res.push(await run("kv-write-parallel", keys, async (input: string) => await env.KV.put(input, val), true));
 		res.push(await run("kv-read-hit", keys, async (input: string) => await env.KV.get(input)));
